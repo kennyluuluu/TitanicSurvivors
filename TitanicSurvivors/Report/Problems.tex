@@ -1,0 +1,183 @@
+\documentclass[11pt]{article}
+
+\usepackage[flushmargin]{footmisc} 
+\usepackage{course}
+\usepackage{soul}
+
+\begin{document}
+
+\ctitle{1}{Decision trees and k-Nearest Neighbors}{Oct. 21, 2019 at 11:59 PM}
+\author{}
+\date{}
+\vspace{-1in}
+\maketitle
+\vspace{-0.75in}
+
+
+\blfootnote{Parts of this assignment are adapted from course material by Andrea Danyluk (Williams), Tom Mitchell and Maria-Florina Balcan (CMU), Stuart Russell (UC Berkeley), Carlos Guestrin (UW) and Jessica Wu (Harvey Mudd).}
+
+
+\section*{Submission instructions}
+\begin{itemize}
+{\large
+\item 
+Submit your written answer on the Gradescope website as a PDF file. Submit your Python code on CCLE. 
+\item If you submit a handwritten solution, please use a high-quality scanner app. If you typeset your solution, please use \LaTeX $\text{ }$.
+}
+\end{itemize}
+
+
+\section{Splitting Heuristic for Decision Trees \problemworth{20}}
+
+The ID3 algorithm iteratively grows a decision tree from the root downwards. On each iteration, the algorithm replaces one leaf node with an internal node that splits the data based on one decision attribute (or feature). In particular, the ID3 algorithm chooses the split that reduces the entropy the most, but there are other choices. For example, since our goal in the end is to have the lowest error, why not instead choose the split that reduces error the most? In this problem, we will explore one reason why reducing entropy is a better criterion.
+
+Consider the following simple setting. Let us suppose each example is described by $n$ boolean features: $X = \langle X_1, \ldots, X_n \rangle$, where $X_i \in \{0, 1\}$, and where $n \geq 4$. Furthermore, the target function to be learned is $f : X \rightarrow Y$, where $Y = X_1 \vee X_2 \vee X_3$. That is, $Y = 1$ if $X_1 = 1$ or $X_2 = 1$ or $X_3 = 1$, and $Y = 0$ otherwise. Suppose that your training data contains all of the $2^n$ possible examples, each labeled by $f$. For example, when $n = 4$, the data set would be
+\begin{table}[H]
+\centering
+\begin{tabular}{cccc|c}
+$X_1$ & $X_2$ & $X_3$ & $X_4$ & $Y$\\ \hline
+0 & 0 & 0 & 0 & 0\\
+1 & 0 & 0 & 0 & 1\\
+0 & 1 & 0 & 0 & 1\\
+1 & 1 & 0 & 0 & 1\\
+0 & 0 & 1 & 0 & 1\\
+1 & 0 & 1 & 0 & 1\\
+0 & 1 & 1 & 0 & 1\\
+1 & 1 & 1 & 0 & 1\\
+\end{tabular}
+\quad \quad \quad \quad
+\begin{tabular}{cccc|c}
+$X_1$ & $X_2$ & $X_3$ & $X_4$ & $Y$\\ \hline
+0 & 0 & 0 & 1 & 0\\
+1 & 0 & 0 & 1 & 1\\
+0 & 1 & 0 & 1 & 1\\
+1 & 1 & 0 & 1 & 1\\
+0 & 0 & 1 & 1 & 1\\
+1 & 0 & 1 & 1 & 1\\
+0 & 1 & 1 & 1 & 1\\
+1 & 1 & 1 & 1 & 1\\
+\end{tabular} \label{table1}
+\end{table}
+
+\begin{enumerate}
+\item \itemworth{5} The $1$-leaf decision tree does not split the data at all; to be more precise, this tree assigns the majority vote which is $Y=1$ to all possible choices of the input $X$ in the table above. How many mistakes does the best $1$-leaf decision tree make over the $2^n$ training examples? Make sure you also answer the general case for any value of $n \geq 4$.
+
+\hl{ANSWER:} In the $n \equal 4$ case, the best 1-leaf decision will mistakenly assign 1 to cases where $X_1 = 0$, $X_2 = 0$, and $X_3 = 0$. $X_1 = 0$ for half of the cases. Within this subset where $X_1 = 0$, half will also have $X_2 = 0$. Likewise, another half of this subset will have $X_3 = 0$. Therefore, $\frac{1}{2}\exp{3}$ of the predictions will be wrong. For $2^n$ case, $2^{n-3}$ labels will be wrong.
+
+
+\item \itemworth{5} Is there one single split that reduces the number of mistakes by at least one? (That is, is there a feature $X_i$ that can be create a decision tree with fewer mistakes than your answer to part (a)?) Explain your answer.
+
+\hl{ANSWER:} No, no matter how you split the data with a single split, the majority of each subset should predict 1. Therefore, the conclusion of each subset will be the same.
+
+\item \itemworth{2} In Table \ref{table1}, what is the entropy of the output label $Y$ on the entire data without any split?
+
+\hl{ANSWER:} entropy = -$\frac{14}{16}$log($\frac{14}{16}$) - $\frac{2}{16}$log($\frac{2}{16}$) = 0.2336145398
+
+\item \itemworth{3} In Table \ref{table1}, you know that variable $X_4$ is unimportant for the label $Y$. What is the conditional entropy of $Y$ given the split on $X_4$ in Table \ref{table1}? What is the gain in entropy for this split? 
+
+\hl{ANSWER:} The conditional entropy of $Y$ given the split on $X_4$ is same as the entropy of the entire data without any split because the ratio of positive to negative on each subset remains the same.
+\begin{equation*} H[S] = \frac{8}{16}(-\frac{7}{8}log\frac{7}{8} - \frac{1}{8}log\frac{1}{8})+\frac{8}{16}(-\frac{7}{8}log\frac{7}{8} - \frac{1}{8}log\frac{1}{8})
+\end{equation*}
+\begin{equation*}
+ = -\frac{7}{8}log\frac{7}{8}-\frac{1}{8}log\frac{1}{8} = 0.2336145398
+\end{equation*}
+\item \itemworth{5} Is there a split that reduces the entropy of the output $Y$ in Table \ref{table1} by a non-zero amount? If so, what is it, and what is the resulting conditional entropy of $Y$ given this split? Notice, unlike (b) which asks about reducing accuracy, here, we are asking about reducing entropy. 
+
+\hl{ANSWER:} Yes, a split on $X_1$, $X_2$, or $X_3$ will each reduce the entropy of the output by the same amount. The resulting conditional entropy would be
+\begin{equation*} H[S] = 0.5(-1log1 - 0log0) + 0.5(-\frac{1}{4}log\frac{1}{4} -\frac{3}{4}log\frac{3}{4})
+\end{equation*}
+\begin{equation*} = 0 + 0.5(0.2442190503) = 0.1221095251
+\end{equation*}
+\end{enumerate}
+
+\section{Entropy and Information \problemworth{9}}
+The entropy of a Bernoulli (Boolean 0/1) random variable $X$ with $p(X = 1) = q$ is given by
+\begin{equation*}
+B(q) = - q \log q - (1 - q) \log(1 - q).
+\end{equation*}
+Notice, this form looks very similar to your quiz 0 question 10 on CCLE. Suppose that a set $S$ of examples contains $p$ positive examples and $n$ negative examples. The entropy of $S$ is defined as $H(S) = B\left(\frac{p}{p+n}\right)$.
+\begin{enumerate}
+	
+\item \itemworth{3} What is the value of $q$ that maximizes $B(q)$? You need to show some equations, do not solve by simply plotting the function $B(q)$.
+
+\hl{ANSWER:} The maximum can be found using B'(q) = 0.
+\begin{equation*}
+B(q) = - q \log q - (1 - q) \log(1 - q)
+\end{equation*}
+\begin{equation*}
+B'(q) = - \log q -q(\frac{1}{q}) - [- \log(1 - q) -(\frac{1}{1 - q})(1 - q)]
+\end{equation*}
+\begin{equation*}
+    = \log (1 - q) - \log q
+\end{equation*}
+When B'(q) = 0,
+\begin{equation*}
+\log (1 - q) = \log q
+\end{equation*}
+\begin{equation*}
+1 - q = q
+\end{equation*}
+\begin{equation*}
+q = \frac{1}{2}
+\end{equation*}
+
+\item \itemworth{6} This problem is a generalization of question 1d, where you observe that splitting the data into 2 groups based on the unimportant $X_4$ yields the same fraction of $Y=0$ and $Y=1$ for each group. Now, based on an attribute $X_j$, we split our examples into $k$ disjoint subsets $S_k$, with $p_k$ positive and $n_k$ negative examples in each. If the ratio $\tfrac{p_k}{p_k + n_k}$ is the same for all $k$, show that the information gain of this attribute is 0.
+
+\hl{ANSWER:} The original entropy is -$\tfrac{p_k}{p_k + n_k}$log($\tfrac{p_k}{p_k + n_k}$)-$\tfrac{n_k}{p_k + n_k}$log($\tfrac{n_k}{p_k + n_k}$).
+
+Now when split into k disjoint subsets, $S_k$, the entropy of each subset remains 
+
+-$\tfrac{p_k}{p_k + n_k}$log($\tfrac{p_k}{p_k + n_k}$)-$\tfrac{n_k}{p_k + n_k}$log($\tfrac{n_k}{p_k + n_k}$) because the ratios are the same.
+The new sum entropy is the weighted average of entropy from all subsets.
+The contribution from the first subset is
+\begin{equation*}
+\frac{|S_1|}{|S_1|+|S_2|+...+|S_k|}(-\frac{p_k}{p_k + n_k}\log(\frac{p_k}{p_k + n_k}) - \frac{n_k}{p_k + n_k}\log(\frac{n_k}{p_k + n_k})
+\end{equation*}
+The sum of all contribution could be simplified to
+\begin{equation*}
+\frac{|S_1|+|S_2|+...+|S_k|}{|S_1|+|S_2|+...+|S_k|}(-\frac{p_k}{p_k + n_k}\log(\frac{p_k}{p_k + n_k}) - \frac{n_k}{p_k + n_k}\log(\frac{n_k}{p_k + n_k})
+\end{equation*}
+This is equivalent to the original entropy because
+\begin{equation*}
+\frac{|S_1|+|S_2|+...+|S_k|}{|S_1|+|S_2|+...+|S_k|} = 1
+\end{equation*}
+
+
+\end{enumerate}
+
+\clearpage
+\section{k-Nearest Neighbors and Cross-validation \problemworth{15}}
+In the following questions you will consider a $k$-nearest neighbor classifier using Euclidean
+distance metric on a binary classification task. 
+We assign the class of the test point to be the
+class of the majority of the $k$ nearest neighbors. 
+Note that a point can be its own neighbor.
+\begin{figure}[h]
+\centering
+\includegraphics[scale=0.45]{knn_figure.png}
+\caption{Dataset for KNN binary classification task.}
+\label{fig:knn}
+\end{figure}
+
+\begin{enumerate}
+\item \itemworth{3} What value of $k$ minimizes the training set error for this dataset? What is
+the resulting training error? Hint: We are not asking about classifying an unknown sample, and for a given training data point, you know its label. 
+
+\hl{ANSWER:} With k = 1, each test point will only consider itself as its own neighbor. Assuming we know its label, the resulting training error would be 0%.
+
+\item \itemworth{3} Why might using too large values $k$ be bad in this dataset? Why might too small values of k also be bad?
+
+\hl{ANSWER:} Using a large k value would be bad in this dataset because it does not allow for complex classification. For example, if k = 5, it would not correctly classify (2,7), (3,8), (7,2), or (8,3).
+For a small value of k, the the classifier would not be helpful in classifying new data. A small value will also incorrectly identify the points such as (7,3) and (3,7).
+
+\item \itemworth{9} What value of $k$ minimizes leave-one-out cross-validation error for this
+dataset? What is the resulting error? I strongly recommend you code this problem, and not compute Euclidean distance by hand. {\underline{Do not submit code for this problem, submit only answer.}}
+
+\hl{ANSWER:} $k$ = 5 and $k$ = 7 minimizes the leave-one-out cross-validation error for this dataset. The resulting error for $k$ = 5 and $k$ = 7 is 0.28571428571.
+
+\end{enumerate}
+
+\input{CodingNoSolution.tex}
+
+
+\end{document}
